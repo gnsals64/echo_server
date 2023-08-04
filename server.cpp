@@ -11,6 +11,7 @@ int main() {
 	int					clnt_sock; // 클라 소켓
     ssize_t             strLen;
     char                buf[100];
+    int                 cnt = 0;
 
 	socklen_t   		clnt_addr_size; // 클라 소켓 길이
 	struct sockaddr_in	serv_addr;
@@ -28,7 +29,7 @@ int main() {
         error_handling((char *)("socket error"));
     int option = 1;
 
-	//setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY); //INADDR_ANY 현재 내 ip를 자동으로 가지고 온다
@@ -40,12 +41,14 @@ int main() {
 	if (listen(serv_sock, 5) == -1)
 		error_handling((char *)("listen error"));
     
+    std::cout << "server start" << std::endl;
+
     struct pollfd pollFDs[100];
 
     pollFDs[0].fd = serv_sock; // 0번째 배열에는 서버 소켓
     pollFDs[0].events = POLLIN; // 읽도록 만듬
     pollFDs[0].revents = 0; // 처음에는 0으로 초기화 (아무것도 안일어남)
-
+    cnt++;
     for (int i = 1; i < 100; i++)
         pollFDs[i].fd = -1;
 
@@ -55,6 +58,8 @@ int main() {
         if (res > 0) {
             if (pollFDs[0].revents == POLLIN) {
                 clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+                cnt++;
+                std::cout << "connect client" << std::endl;
                 for (int i = 1; i < 100; i++) {
                     if (pollFDs[i].fd == -1) {
                         pollFDs[i].fd = clnt_sock ;
@@ -65,17 +70,18 @@ int main() {
                 }
             }
 
-            for (int i = 1; i < 100; i++) {
+            for (int i = 1; i < cnt && i < 100; i++) {
                 switch (pollFDs[i].revents){
                     case 0:
                         break ;
                     case POLLIN:
                         strLen = read(pollFDs[i].fd, buf, 100);
-                        std::cout << strLen << " bytes read\n" << std::endl;
+                        std::cout << strLen << " bytes read" << std::endl;
                         buf[strLen] = '\0';
                         fputs(buf, stdout);
                         fflush(stdout);
                         write(pollFDs[i].fd, buf, strlen(buf));
+                        break ;
                     default:
                         close(pollFDs[i].fd);
                         pollFDs[i].fd = -1;
